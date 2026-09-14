@@ -20,7 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useAuth, useLang } from '@/components/providers';
-import { db } from '@/lib/db';
+import { db, registerUser } from '@/lib/db';
 import type { School, Teacher, Student, SchoolClass, Subject, AttendanceRecord, Grade, Parent, Role } from '@/lib/types';
 
 export default function DirectorDashboard() {
@@ -292,7 +292,8 @@ function TeachersManager({ lang, schoolId, subjects, teachers, onRefresh }: any)
 
   const handleAdd = () => {
     if (!name.trim() || !username.trim() || !password.trim()) return;
-    db.teachers.add({ schoolId, fullName: name, subject, username, password } as Omit<Teacher, 'id' | 'createdAt'>);
+    const teacher = db.teachers.add({ schoolId, fullName: name, subject, username, password } as Omit<Teacher, 'id' | 'createdAt'>);
+    registerUser({ username, password, role: 'teacher', schoolId, displayName: name, localId: teacher.id });
     setName(''); setUsername(''); setPassword(''); setSubject('');
     onRefresh();
   };
@@ -383,7 +384,8 @@ function StudentsManager({ lang, schoolId, classes, students, parents, onRefresh
 
   const handleAdd = () => {
     if (!name.trim() || !classId || !username.trim() || !password.trim()) return;
-    db.students.add({ schoolId, classId, parentId: parentId || 'none', fullName: name, username, password } as Omit<Student, 'id' | 'createdAt'>);
+    const student = db.students.add({ schoolId, classId, parentId: parentId || 'none', fullName: name, username, password } as Omit<Student, 'id' | 'createdAt'>);
+    registerUser({ username, password, role: 'student', schoolId, displayName: name, localId: student.id });
     setName(''); setClassId(''); setParentId(''); setUsername(''); setPassword('');
     onRefresh();
   };
@@ -589,14 +591,17 @@ function CredentialGenerator({ lang, schoolId, teachers, students, parents, onRe
 
       if (role === 'teacher') {
         const subject = subjects.length > 0 ? subjects[i % subjects.length].name : 'General';
-        db.teachers.add({ schoolId, fullName: `Teacher ${random.toUpperCase()}`, subject, username, password } as Omit<Teacher, 'id' | 'createdAt'>);
+        const teacher = db.teachers.add({ schoolId, fullName: `Teacher ${random.toUpperCase()}`, subject, username, password } as Omit<Teacher, 'id' | 'createdAt'>);
+        registerUser({ username, password, role: 'teacher', schoolId, displayName: `Teacher ${random.toUpperCase()}`, localId: teacher.id });
         results.push({ role, username, password, name: `Teacher ${random.toUpperCase()}` });
       } else if (role === 'student') {
         const classId = classes.length > 0 ? classes[0].id : '';
-        db.students.add({ schoolId, classId, parentId: 'none', fullName: `Student ${random.toUpperCase()}`, username, password } as Omit<Student, 'id' | 'createdAt'>);
+        const student = db.students.add({ schoolId, classId, parentId: 'none', fullName: `Student ${random.toUpperCase()}`, username, password } as Omit<Student, 'id' | 'createdAt'>);
+        registerUser({ username, password, role: 'student', schoolId, displayName: `Student ${random.toUpperCase()}`, localId: student.id });
         results.push({ role, username, password, name: `Student ${random.toUpperCase()}` });
       } else {
-        db.parents.add({ schoolId, fullName: `Parent ${random.toUpperCase()}`, username, password } as Omit<Parent, 'id' | 'createdAt'>);
+        const parent = db.parents.add({ schoolId, fullName: `Parent ${random.toUpperCase()}`, username, password } as Omit<Parent, 'id' | 'createdAt'>);
+        registerUser({ username, password, role: 'parent', schoolId, displayName: `Parent ${random.toUpperCase()}`, localId: parent.id });
         results.push({ role, username, password, name: `Parent ${random.toUpperCase()}` });
       }
     }

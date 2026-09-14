@@ -7,14 +7,14 @@ import type { User, Language } from '@/lib/types';
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (username: string, password: string) => boolean;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
-  login: () => false,
+  login: async () => false,
   logout: () => {},
 });
 
@@ -29,8 +29,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return off;
   }, []);
 
-  const login = useCallback((username: string, password: string) => {
-    const u = authenticate(username, password);
+  const login = useCallback(async (username: string, password: string) => {
+    const u = await authenticate(username, password);
     if (u) {
       setSession(u);
       setUser(u);

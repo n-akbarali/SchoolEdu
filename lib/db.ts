@@ -2,6 +2,7 @@ import type {
   School, Teacher, Student, Parent, SchoolClass, Subject,
   TimetableSlot, AttendanceRecord, Grade, Homework, Notification, User,
 } from './types';
+import { supabase } from './supabase';
 
 const PREFIX = 'a7school_';
 
@@ -50,6 +51,40 @@ function makeStore<T extends { id: string; createdAt: number }>(key: string) {
       write(key, all);
     },
   };
+}
+
+// Central user registry — syncs credentials to Supabase so accounts work cross-device
+export async function registerUser(entry: {
+  username: string;
+  password: string;
+  role: 'director' | 'teacher' | 'student' | 'parent';
+  schoolId?: string;
+  displayName: string;
+  localId?: string;
+}): Promise<void> {
+  const usernameLower = entry.username.trim().toLowerCase();
+  try {
+    await supabase.from('app_users').delete().ilike('username', usernameLower);
+    const { error } = await supabase.from('app_users').insert({
+      username: usernameLower,
+      password: entry.password.trim(),
+      role: entry.role,
+      school_id: entry.schoolId || null,
+      display_name: entry.displayName,
+      local_id: entry.localId || null,
+    });
+    if (error) console.error('registerUser error:', error.message);
+  } catch (err) {
+    console.error('registerUser exception:', err);
+  }
+}
+
+export async function unregisterUser(localId: string): Promise<void> {
+  try {
+    await supabase.from('app_users').delete().eq('local_id', localId);
+  } catch (err) {
+    console.error('unregisterUser exception:', err);
+  }
 }
 
 export const db = {
@@ -101,22 +136,47 @@ export function onSessionChange(callback: () => void): () => void {
   };
 }
 
-// Auth logic
-export function authenticate(username: string, password: string): User | null {
-  // Superadmin check
-  if (username === 'nematov' && password === '5717') {
+// Auth logic — checks Supabase registry first (cross-device), then localStorage fallback
+export async function authenticate(username: string, password: string): Promise<User | null> {
+  const u = username.trim().toLowerCase();
+  const p = password.trim();
+
+  // Superadmin check (hardcoded, always works)
+  if (u === 'nematov' && p === '5717') {
     return { id: 'superadmin', role: 'superadmin', username: 'nematov', name: 'Superadmin' };
   }
 
+  // 1. Check central Supabase registry (works across all browsers/devices)
+  try {
+    const { data, error } = await supabase
+      .from('app_users')
+      .select('id, username, password, role, school_id, display_name, local_id')
+      .ilike('username', u)
+      .maybeSingle();
+
+    if (!error && data && data.password === p) {
+      return {
+        id: data.local_id || data.id,
+        role: data.role as User['role'],
+        username: data.username,
+        schoolId: data.school_id || undefined,
+        name: data.display_name,
+      };
+    }
+  } catch (err) {
+    console.error('Supabase auth lookup failed, falling back to localStorage:', err);
+  }
+
+  // 2. Fallback: check localStorage (same-browser only)
   // Director check
   const school = db.schools.getAll().find(
-    (s) => s.directorUsername === username && s.directorPassword === password
+    (s) => s.directorUsername.trim().toLowerCase() === u && s.directorPassword.trim() === p
   );
   if (school) {
     return {
       id: school.id,
       role: 'director',
-      username,
+      username: school.directorUsername,
       schoolId: school.id,
       name: school.name,
     };
@@ -124,13 +184,13 @@ export function authenticate(username: string, password: string): User | null {
 
   // Teacher check
   const teacher = db.teachers.getAll().find(
-    (t) => t.username === username && t.password === password
+    (t) => t.username.trim().toLowerCase() === u && t.password.trim() === p
   );
   if (teacher) {
     return {
       id: teacher.id,
       role: 'teacher',
-      username,
+      username: teacher.username,
       schoolId: teacher.schoolId,
       name: teacher.fullName,
     };
@@ -138,13 +198,13 @@ export function authenticate(username: string, password: string): User | null {
 
   // Parent check
   const parent = db.parents.getAll().find(
-    (p) => p.username === username && p.password === password
+    (item) => item.username.trim().toLowerCase() === u && item.password.trim() === p
   );
   if (parent) {
     return {
       id: parent.id,
       role: 'parent',
-      username,
+      username: parent.username,
       schoolId: parent.schoolId,
       name: parent.fullName,
     };
@@ -152,13 +212,13 @@ export function authenticate(username: string, password: string): User | null {
 
   // Student check
   const student = db.students.getAll().find(
-    (s) => s.username === username && s.password === password
+    (item) => item.username.trim().toLowerCase() === u && item.password.trim() === p
   );
   if (student) {
     return {
       id: student.id,
       role: 'parent',
-      username,
+      username: student.username,
       schoolId: student.schoolId,
       name: student.fullName,
     };

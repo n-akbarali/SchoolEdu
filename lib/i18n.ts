@@ -8,7 +8,7 @@ const translations = {
     password: 'Parol',
     logout: 'Chiqish',
     welcomeBack: 'Xush kelibsiz',
-    invalidCredentials: 'Noto\'g\'ri foydalanuvchi nomi yoki parol',
+    invalidCredentials: 'Foydalanuvchi nomi yoki parol noto\'g\'ri',
     // Nav
     dashboard: 'Boshqaruv paneli',
     students: 'O\'quvchilar',

@@ -35,16 +35,20 @@ export default function LoginPage() {
     }
   }, [user, loading, router]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setError('');
-    const ok = login(username.trim(), password);
-    if (!ok) {
+    try {
+      const ok = await login(username.trim(), password.trim());
+      if (!ok) {
+        setError(t(lang, 'invalidCredentials'));
+        setSubmitting(false);
+      }
+    } catch {
       setError(t(lang, 'invalidCredentials'));
       setSubmitting(false);
     }
-    // If ok, the useEffect will redirect
   };
 
   return (

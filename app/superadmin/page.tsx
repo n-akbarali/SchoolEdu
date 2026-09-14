@@ -20,7 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { useLang } from '@/components/providers';
-import { db } from '@/lib/db';
+import { db, registerUser } from '@/lib/db';
 import { PLANS, getPlanForStudents, formatUZS, calculateMonthlyCost } from '@/lib/pricing';
 import type { School, Plan } from '@/lib/types';
 // SchoolIcon is the lucide icon; School is the type
@@ -413,8 +413,8 @@ function OnboardingWizard({ open, onOpenChange, onComplete, lang }: {
     setStep((s) => Math.min(s + 1, 2));
   };
 
-  const submit = () => {
-    db.schools.add({
+  const submit = async () => {
+    const school = db.schools.add({
       name,
       city,
       studentCount,
@@ -422,6 +422,14 @@ function OnboardingWizard({ open, onOpenChange, onComplete, lang }: {
       directorUsername,
       directorPassword,
     } as Omit<School, 'id' | 'createdAt'>);
+    await registerUser({
+      username: directorUsername,
+      password: directorPassword,
+      role: 'director',
+      schoolId: school.id,
+      displayName: name,
+      localId: school.id,
+    });
     handleClose(false);
     onComplete();
   };
